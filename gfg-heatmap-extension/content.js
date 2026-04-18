@@ -86,38 +86,63 @@ function processHeatmap() {
 
     let targetCells = [];
 
-    // Find cells across possible selectors
+    // Attempt 1: Look by exact classes or attributes if present
     for (const selector of HEATMAP_SELECTORS) {
-        // Find elements matching the selector inside a potential heatmap container
-        // Targeting specific SVG or DIV containers typically housing the heatmap 
-        const container = document.querySelector('svg.js-calendar-graph-svg, .heatmap-container, [id*="heatmap"], .js-calendar-graph');
-        
-        let elements = null;
-        if (container) {
-            elements = container.querySelectorAll(selector);
-        } else {
-            // Unscoped selection if container not explicitly matchable
-            elements = document.querySelectorAll(selector);
-        }
-        
-        // Filter out non-gridcell rectangles/divs by structural heuristics
-        const potentialCells = Array.from(elements || []).filter(el => {
-            const width = el.getAttribute('width') || el.offsetWidth;
-            const height = el.getAttribute('height') || el.offsetHeight;
-            // Heatmap cells are typically small square-ish boxes
-            return (width && height && width < 30 && height < 30) || el.hasAttribute('data-date');
-        });
-
-        if (potentialCells.length >= 30) {
-            targetCells = potentialCells;
+        const elements = document.querySelectorAll(selector);
+        // If it's a gridcell and there's 50+ of them, it's the heatmap
+        if (elements.length > 50) {
+            targetCells = Array.from(elements);
             break;
         }
     }
 
-    if (targetCells.length > 0) {
+    // Attempt 2: Visual spatial heuristic (GFG React components might obscure classes)
+    if (targetCells.length < 50) {
+        const allElements = document.querySelectorAll('div, span, rect');
+        const sizeMatched = [];
+        for (let el of allElements) {
+            const rect = el.getBoundingClientRect();
+            // A heatmap cell is typically a small, square, empty block around 10-22px
+            if (rect.width >= 8 && rect.width <= 25 && rect.height >= 8 && rect.height <= 25 && el.childElementCount === 0) {
+                // Ignore elements that aren't generic squares (e.g. text containing elements or icons)
+                const text = el.textContent.trim();
+                const isSvgOrPath = el.tagName.toLowerCase() === 'svg' || el.tagName.toLowerCase() === 'path';
+                if (!text && !isSvgOrPath && getComputedStyle(el).display !== 'none') {
+                    sizeMatched.push(el);
+                }
+            }
+        }
+        
+        if (sizeMatched.length > 100) {
+            // Group by className to avoid randomly sized generic icons breaking the index
+            const classCounts = {};
+            sizeMatched.forEach(el => {
+                // Ignore SVG internals like SVGRectElement className objects
+                const cls = typeof el.className === 'string' ? el.className.split(' ')[0] : 'no-class';
+                classCounts[cls] = (classCounts[cls] || 0) + 1;
+            });
+            
+            // Map the class appearing ~100 to 450 times (like typical 365 heatmap grid)
+            let dominantClass = Object.keys(classCounts).reduce((a, b) => classCounts[a] > classCounts[b] ? a : b, '');
+            
+            if (classCounts[dominantClass] > 50) {
+                 targetCells = sizeMatched.filter(el => {
+                     const cls = typeof el.className === 'string' ? el.className.split(' ')[0] : 'no-class';
+                     return cls === dominantClass;
+                 });
+            } else {
+                 targetCells = sizeMatched;
+            }
+            if (CONFIG.debug) console.log(`[GFG Heatmap Faker] Detected using visual heuristic: ${targetCells.length} cells with dom-class '${dominantClass}'`);
+        }
+    }
+
+    if (targetCells.length >= 50) {
+        // Ensure they are chronologically sorted if possible (document flow usually guarantees this)
         applyColorsToCells(targetCells);
         return true;
     } else {
+        if (CONFIG.debug) console.log("[GFG Heatmap Faker] No heatmap grid found yet...");
         return false;
     }
 }
