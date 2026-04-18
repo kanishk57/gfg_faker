@@ -136,9 +136,15 @@ function processHeatmap() {
     // Attempt 1: Look by exact classes or attributes if present
     for (const selector of HEATMAP_SELECTORS) {
         const elements = document.querySelectorAll(selector);
-        // If it's a gridcell and there's 50+ of them, it's the heatmap
-        if (elements.length > 50) {
-            targetCells = Array.from(elements);
+        // Filter out parent wrappers: we only want the tiny leaf grid cells
+        const leafElements = Array.from(elements).filter(el => 
+            (el.children.length === 0 || el.tagName.toLowerCase() === 'rect') && 
+            (el.offsetWidth <= 30 && el.offsetHeight <= 30 || el.tagName.toLowerCase() === 'rect')
+        );
+
+        // If it's a gridcell and there's roughly a year's worth of them, it's the heatmap
+        if (leafElements.length > 50) {
+            targetCells = leafElements;
             break;
         }
     }
