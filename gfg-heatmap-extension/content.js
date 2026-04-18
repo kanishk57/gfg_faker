@@ -4,7 +4,7 @@ const HEATMAP_SELECTORS = [
     '[class*="contribution"]',
     '[class*="heat"]',
     '[data-date]',
-    'role="gridcell"'
+    '[role="gridcell"]'
 ];
 
 const MAX_RETRIES = 10;
@@ -14,17 +14,24 @@ let heatmapProcessed = false;
 function applyColorsToCells(cells) {
     if (!cells || cells.length === 0) return;
     
-    // Check if this looks like a heatmap by ensuring there's a decent number of cells (e.g., 30+)
     if (cells.length < 30) return;
 
+    // Generate specific target dates (April 1, 2026, to Today)
+    const targetDates = generateTargetDates();
+
     if (CONFIG.debug) {
-        console.log(`[GFG Heatmap Faker] Processing ${cells.length} cells...`);
+        console.log(`[GFG Heatmap Faker] Processing ${cells.length} cells. Target dates map:`, targetDates);
     }
 
-    const activity = generateActivitySequence(cells.length);
+    cells.forEach((cell) => {
+        const cellDateAttr = cell.getAttribute('data-date');
+        let intensity = 0;
 
-    cells.forEach((cell, index) => {
-        const intensity = activity[index] || 0;
+        // If the cell has a date and it's in our generated targets map, assign its intensity
+        if (cellDateAttr && targetDates[cellDateAttr]) {
+            intensity = targetDates[cellDateAttr];
+        }
+
         const color = COLORS[intensity];
 
         // Apply styles appropriately depending on the element type
@@ -41,7 +48,7 @@ function applyColorsToCells(cells) {
 
     heatmapProcessed = true;
     if (CONFIG.debug) {
-        console.log("[GFG Heatmap Faker] Successfully applied fake contribution data.");
+        console.log("[GFG Heatmap Faker] Successfully applied fake contribution targeted dates.");
     }
 }
 

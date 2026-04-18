@@ -1,10 +1,14 @@
 // Configuration Object
 const CONFIG = {
-    activityProbability: 0.7, // 70% chance of overall activity
+    activityProbability: 0.7, // unused with explicit date targeting 
     maxIntensity: 4,          // scale range 0-4
-    streakBias: 0.15,         // increases daily action likelihood after consecutive days
-    debug: false,             // print console logs
-    seed: "kanishk-demo"      // basic deterministic seed
+    streakBias: 0.15,         // unused with explicit date targeting
+    debug: true,              // print console logs
+    seed: null,               // randomize it so we get 8-10 random boxes
+    targetBoxCountMin: 8,     // target minimum 8 active boxes
+    targetBoxCountMax: 10,    // target maximum 10 active boxes
+    startDate: new Date('2026-04-01'), // start date for active boxes
+    endDate: new Date()       // today's date for active boxes
 };
 
 // Intensity scale colors (similar to GitHub and GFG scales)
@@ -51,26 +55,40 @@ function getIntensity(isActive) {
 }
 
 /**
- * Generate sequence of active days using Markov-like probability logic for streaks.
+ * Generate a set of targeted dates to be colored green based on the config date range and counts.
  */
-function generateActivitySequence(daysCount) {
-    const sequence = [];
-    let previousActive = false;
+function generateTargetDates() {
+    let dates = [];
+    let start = new Date(CONFIG.startDate);
+    let end = new Date(CONFIG.endDate);
 
-    for (let i = 0; i < daysCount; i++) {
-        let prob = CONFIG.activityProbability;
-        
-        // Add streak bias
-        if (previousActive) {
-            prob += CONFIG.streakBias;
-        }
+    // Collect all valid dates in range
+    for (let dt = new Date(start); dt <= end; dt.setDate(dt.getDate() + 1)) {
+        // Format to YYYY-MM-DD
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, '0');
+        const dd = String(dt.getDate()).padStart(2, '0');
+        dates.push(`${yyyy}-${mm}-${dd}`);
+    }
 
-        const willBeActive = randomFunc() < prob;
-        const intensity = getIntensity(willBeActive);
-        
-        sequence.push(intensity);
-        previousActive = willBeActive;
+    // Determine target count (e.g., between 8 and 10)
+    const targetCount = Math.floor(randomFunc() * (CONFIG.targetBoxCountMax - CONFIG.targetBoxCountMin + 1)) + CONFIG.targetBoxCountMin;
+
+    // Pick random valid dates without replacement
+    let selectedDates = new Set();
+    while (selectedDates.size < targetCount && dates.length > 0) {
+        const randomIndex = Math.floor(randomFunc() * dates.length);
+        const selectedDate = dates[randomIndex];
+        selectedDates.add(selectedDate);
+        dates.splice(randomIndex, 1);
     }
     
-    return sequence;
+    // Assign random intensity map to those chosen dates
+    const dateIntensityMap = {};
+    selectedDates.forEach(date => {
+        // give each active day a random intensity between 1 and 4
+        dateIntensityMap[date] = getIntensity(true);
+    });
+
+    return dateIntensityMap;
 }
