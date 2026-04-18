@@ -4,11 +4,11 @@ const CONFIG = {
     maxIntensity: 4,          // scale range 0-4
     streakBias: 0.15,         // unused with explicit date targeting
     debug: true,              // print console logs
-    seed: null,               // randomize it so we get 8-10 random boxes
+    seed: "fixed-dates-gfg",  // set a static seed so the same boxes stay green permanently
     targetBoxCountMin: 8,     // target minimum 8 active boxes
     targetBoxCountMax: 10,    // target maximum 10 active boxes
     startDate: new Date('2026-04-01'), // start date for active boxes
-    endDate: new Date()       // today's date for active boxes
+    endDate: new Date('2026-04-18')    // static end date to freeze the box progression exactly
 };
 
 // Intensity scale colors (similar to GitHub and GFG scales)
