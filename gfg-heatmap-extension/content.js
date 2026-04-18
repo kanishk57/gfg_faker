@@ -25,34 +25,80 @@ function applyColorsToCells(cells) {
         console.log(`[GFG Heatmap Faker] Processing ${cells.length} cells. Target dates map:`, targetDates);
     }
     
-    // Check if the first few cells have data-date attribute to know how to target
-    const hasDataDate = Array.from(cells).some(cell => cell.hasAttribute('data-date'));
+    // Check if cells have any date-like attribute to know how to target directly
+    const hasDateInfo = Array.from(cells).some(cell => 
+        cell.hasAttribute('data-date') || 
+        cell.hasAttribute('title') || 
+        cell.hasAttribute('data-tip') || 
+        (cell.textContent && cell.textContent.includes('2026'))
+    );
     
-    // If no data-date, we will target the last ~18 boxes (since today is April 18)
+    // If zero direct date info, we will target exactly the indices for April 1st to April 18th in a 365 day year
     const fallbackTargetIndices = new Set();
-    if (!hasDataDate) {
-        const totalCells = cells.length;
-        // The last 18 boxes represent roughly April 1 to April 18
+    if (!hasDateInfo) {
+        // In 2026, April 1 is the 91st day (index 90). April 18 is 108th day (index 107).
         const targetCount = Math.floor(randomFunc() * (CONFIG.targetBoxCountMax - CONFIG.targetBoxCountMin + 1)) + CONFIG.targetBoxCountMin;
         
-        while (fallbackTargetIndices.size < targetCount) {
-            // Pick a random index in the last 18 boxes
-            const randomIndex = totalCells - 1 - Math.floor(randomFunc() * 18);
-            if (randomIndex >= 0) {
-                fallbackTargetIndices.add(randomIndex);
-            }
+        let attempts = 0;
+        let validIndices = [];
+        for(let i = 90; i <= 107; i++) validIndices.push(i);
+        
+        // Randomly pick targetCount items from the validIndices
+        while (fallbackTargetIndices.size < targetCount && validIndices.length > 0) {
+            const randomIndex = Math.floor(randomFunc() * validIndices.length);
+            fallbackTargetIndices.add(validIndices[randomIndex]);
+            validIndices.splice(randomIndex, 1);
         }
     }
 
     cells.forEach((cell, index) => {
-        const cellDateAttr = cell.getAttribute('data-date');
+        let cellDateAttr = cell.getAttribute('data-date') || cell.getAttribute('title') || cell.getAttribute('data-tip') || cell.getAttribute('data-bs-original-title') || '';
+        
+        // Sometimes dates are embedded as text in tooltips inside the cell
+        if (!cellDateAttr && cell.children.length > 0) {
+            const innerText = cell.textContent.trim();
+            if (innerText.match(/\d{4}-\d{2}-\d{2}/) || innerText.match(/2026/)) {
+                cellDateAttr = innerText;
+            }
+        }
+        
         let intensity = 0;
 
-        // If the cell has a date and it's in our generated targets map, assign its intensity
-        if (cellDateAttr && targetDates[cellDateAttr]) {
-            intensity = targetDates[cellDateAttr];
-        } else if (!hasDataDate && fallbackTargetIndices.has(index)) {
-             // Fallback: if we don't have dates, just use the index
+        // Strip leading zeros or different formatting to maximize match chances
+        const normalizedAttr = cellDateAttr ? cellDateAttr.replace(/-0?/g, '-').replace(/\//g, '-') : '';
+
+        // Check against our target map
+        let foundDateMatch = false;
+        if (cellDateAttr) {
+            for (let dateKey in targetDates) {
+                // dateKey is YYYY-MM-DD
+                const normalizedKey = dateKey.replace(/-0?/g, '-');
+                if (normalizedAttr.includes(normalizedKey)) { // use includes just in case it's "18 contributions on 2026-04-18"
+                    intensity = targetDates[dateKey];
+                    foundDateMatch = true;
+                    break;
+                }
+            }
+            
+            // Try matching textual date formats like "April 18, 2026" or "18 Apr 2026"
+            if (!foundDateMatch) {
+                for (let dateKey in targetDates) {
+                    const d = new Date(dateKey);
+                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const monthFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                    if (normalizedAttr.includes(monthNames[d.getMonth()]) || normalizedAttr.includes(monthFull[d.getMonth()])) {
+                        if (normalizedAttr.includes(String(d.getDate())) && normalizedAttr.includes("2026")) {
+                            intensity = targetDates[dateKey];
+                            foundDateMatch = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!foundDateMatch && !hasDateInfo && fallbackTargetIndices.has(index)) {
+             // Fallback: if we don't have dates at all, just use the chronological index exactly in April
             intensity = getIntensity(true);
         }
 
@@ -61,6 +107,7 @@ function applyColorsToCells(cells) {
 
             // Apply styles appropriately depending on the element type
             if (cell.tagName.toLowerCase() === 'rect') {
+                cell.setAttribute('fill', color);
                 cell.style.fill = color;
             } else {
                 cell.style.backgroundColor = color;
