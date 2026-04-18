@@ -4,7 +4,9 @@ const HEATMAP_SELECTORS = [
     '[class*="contribution"]',
     '[class*="heat"]',
     '[data-date]',
-    '[role="gridcell"]'
+    '[role="gridcell"]',
+    '.calendar-box', // GFG common
+    '.activity-box'  // GFG common
 ];
 
 const MAX_RETRIES = 10;
@@ -22,28 +24,55 @@ function applyColorsToCells(cells) {
     if (CONFIG.debug) {
         console.log(`[GFG Heatmap Faker] Processing ${cells.length} cells. Target dates map:`, targetDates);
     }
+    
+    // Check if the first few cells have data-date attribute to know how to target
+    const hasDataDate = Array.from(cells).some(cell => cell.hasAttribute('data-date'));
+    
+    // If no data-date, we will target the last ~18 boxes (since today is April 18)
+    const fallbackTargetIndices = new Set();
+    if (!hasDataDate) {
+        const totalCells = cells.length;
+        // The last 18 boxes represent roughly April 1 to April 18
+        const targetCount = Math.floor(randomFunc() * (CONFIG.targetBoxCountMax - CONFIG.targetBoxCountMin + 1)) + CONFIG.targetBoxCountMin;
+        
+        while (fallbackTargetIndices.size < targetCount) {
+            // Pick a random index in the last 18 boxes
+            const randomIndex = totalCells - 1 - Math.floor(randomFunc() * 18);
+            if (randomIndex >= 0) {
+                fallbackTargetIndices.add(randomIndex);
+            }
+        }
+    }
 
-    cells.forEach((cell) => {
+    cells.forEach((cell, index) => {
         const cellDateAttr = cell.getAttribute('data-date');
         let intensity = 0;
 
         // If the cell has a date and it's in our generated targets map, assign its intensity
         if (cellDateAttr && targetDates[cellDateAttr]) {
             intensity = targetDates[cellDateAttr];
+        } else if (!hasDataDate && fallbackTargetIndices.has(index)) {
+             // Fallback: if we don't have dates, just use the index
+            intensity = getIntensity(true);
         }
 
-        const color = COLORS[intensity];
+        if (intensity > 0) {
+            const color = COLORS[intensity];
 
-        // Apply styles appropriately depending on the element type
-        if (cell.tagName.toLowerCase() === 'rect') {
-            cell.style.fill = color;
-        } else {
-            cell.style.backgroundColor = color;
+            // Apply styles appropriately depending on the element type
+            if (cell.tagName.toLowerCase() === 'rect') {
+                cell.style.fill = color;
+            } else {
+                cell.style.backgroundColor = color;
+            }
+
+            // Some cells might use CSS attributes instead of styles, apply fallback dataset overrides
+            cell.setAttribute('data-level', intensity);
+            cell.setAttribute('data-faked', 'true');
+            // Force inline style with !important to override external CSS
+            cell.style.setProperty('background-color', color, 'important');
+            cell.style.setProperty('fill', color, 'important');
         }
-
-        // Some cells might use CSS attributes instead of styles, apply fallback dataset overrides
-        cell.setAttribute('data-level', intensity);
-        cell.setAttribute('data-faked', 'true');
     });
 
     heatmapProcessed = true;
