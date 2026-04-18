@@ -11,7 +11,9 @@
     {
       "matches": [
         "https://www.geeksforgeeks.org/user/*",
-        "https://auth.geeksforgeeks.org/user/*"
+        "https://auth.geeksforgeeks.org/user/*",
+        "https://www.geeksforgeeks.org/profile/*",
+        "https://auth.geeksforgeeks.org/profile/*"
       ],
       "js": ["utils.js", "content.js"],
       "run_at": "document_idle"
