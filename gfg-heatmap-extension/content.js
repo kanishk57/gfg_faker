@@ -136,11 +136,15 @@ function processHeatmap() {
     // Attempt 1: Look by exact classes or attributes if present
     for (const selector of HEATMAP_SELECTORS) {
         const elements = document.querySelectorAll(selector);
-        // Filter out parent wrappers: we only want the tiny leaf grid cells
-        const leafElements = Array.from(elements).filter(el => 
-            (el.children.length === 0 || el.tagName.toLowerCase() === 'rect') && 
-            (el.offsetWidth <= 30 && el.offsetHeight <= 30 || el.tagName.toLowerCase() === 'rect')
-        );
+        // Filter out parent wrappers or large background SVG rects: we only want the tiny leaf grid cells
+        const leafElements = Array.from(elements).filter(el => {
+            const isRect = el.tagName.toLowerCase() === 'rect';
+            const rectDetails = el.getBoundingClientRect();
+            // Valid boxes are typically 8px to 25px wide/tall. Reject huge container boxes or wide SVG backgrounds.
+            const validSize = rectDetails.width > 5 && rectDetails.width <= 25 && rectDetails.height > 5 && rectDetails.height <= 25;
+            
+            return (el.children.length === 0 || isRect) && validSize;
+        });
 
         // If it's a gridcell and there's roughly a year's worth of them, it's the heatmap
         if (leafElements.length > 50) {
